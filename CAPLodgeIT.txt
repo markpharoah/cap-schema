@@ -1,0 +1,101 @@
+# commercial ● ACCOUNTING
+
+**SESSION RECORD — LODGEIT SEED COMPLETE: THE PRACTICE ARRIVES**
+Commercial Accounting Practice (CAP) · 11 September 2026
+
+---
+
+## Outcome
+
+The full practice identity spine is live in Dataverse, loaded from real
+LodgeIT exports and converged to zero findings outstanding on edges.
+**309 entities** (199 Active incl. the practice's own trust, 109 Former
+tombstones, 1 Harborne demonstration), **166 relationship edges**, complete
+15-option relationship vocabulary. Every data-quality wart in the source
+was caught and reported, none absorbed. In-flight seed (handover steps
+1–7): CLOSED.
+
+## Commits
+
+| Commit | Content |
+|---|---|
+| a0f5741 | seed-clients.ps1 (survivor rule), find-dup-tfns.ps1, verify-entities.ps1, clean-rels.ps1, probe-choices.ps1 |
+| 9b97a95 | rel-types-topup.ps1 — six types pinned 764820009–014; vocabulary complete at 15 |
+| a37b830 | probe-rels.ps1, seed-relationships.ps1 — 164 edges, mirrors normalised 310→166 |
+| (this session) | seed-practice-entity.ps1 — practice trust as normal entity [CAS]; final 2 edges landed |
+
+## Doctrine ratified this session
+
+1. **Duplicate-TFN survivor rule.** LodgeIT does not enforce TFN uniqueness;
+   CAP's alternate key does. Pre-scan groups duplicates; survivor keeps the
+   TFN (Active beats Former, tie by first-in-file); non-survivors load
+   WITHOUT TFN — identity and clientcode intact so relationship edges never
+   lose an end. Belt-and-braces try/catch retries without TFN on 0x80060892.
+   Findings table at exit = LodgeIT clean-up list. Three duplicate pairs
+   found and suppressed.
+2. **Directed edges, mirror-free storage.** The 15-option vocabulary is
+   one-directional (…of). LodgeIT's bare-label mirrors ("Director" vs
+   "Director Of") are import-time translations only: bare rows load
+   ends-swapped; symmetric types (Spouse, Associated With) normalise to
+   unordered pair; Parent Of canonicalises to Child of ends-swapped; dedupe
+   on (from,to,type) after normalisation. One fact, one row; the mirror
+   belongs to the VIEW layer (each end's screen renders the same row from
+   its own perspective — record once with dates, display mirrored).
+   LodgeIT's own drift proved the point: Spouse 69 (odd) = at least one
+   marriage recorded one side only; Director 44/42 = 8 single-sided.
+3. **No special entities.** LodgeIT's agent head record (#CAS) is vendor
+   scaffolding. The practice's own trust loads as a NORMAL entity,
+   clientcode CAS retained as the faithful LodgeIT sync key (legacy code
+   shape accepted). Tax-agent capacity is NOT identity and NOT a status:
+   per-engagement it already lives in cap_regulatorycapacity; the standing
+   registration facts get a future temporal table (below). Nothing
+   structurally special enters the spine.
+4. **cap_agentregistration (spec'd, deferred).** Lookup to cap_entity ·
+   registration type (choice: Tax Agent, BAS Agent, extensible) · number ·
+   branch · start/end dates · notes. Multiple agents = multiple rows, no
+   feature logic. Build when the lodgement module or LodgeIT sync first
+   asks "who is the agent, as at this date". Covers restructure/succession
+   and parallel registrations by structure alone. Known facts to seed then:
+   Tax Agent 76856008, branch 001, on the practice trust [CAS].
+5. **Vocabulary asserted before any write.** seed-relationships halts red
+   on unmapped type text — never load wrong. All 21 source texts mapped.
+6. **Hashtable null-key lesson.** ?? guards the value, not the key; status
+   verifies coalesce null keys to "(none)" (Harborne has no status).
+7. **Metadata cache lag confirmed on choice inserts.** Six inserts
+   succeeded; immediate verify read 11 of 15; rerun read 15. Verify reads
+   lag — rerun the verify before panicking (standing rule).
+
+## Findings register (pending, non-blocking)
+
+- Three TFN duplicate pairs → merge/fix in LodgeIT at next clean-up sweep
+  (two archived/re-added, one live pair in the principal's own records).
+  CAS edge findings: RESOLVED this session via normal-entity load + retry.
+
+## Numbers that must hold (extend 00-verify baseline)
+
+- cap_entity: 309 (199 × 764820000, 109 × 764820003, 1 null status)
+- cap_entityrelationship: 166 (Trustee 16 · Director 47 · Shareholder 19 ·
+  Member 1 · Partner 6 · Public Office 3 · Secretary 1 · Beneficiary 32 ·
+  Spouse 36 · Child 3 · Associated 1 · Other 1)
+- cap_relationshiptype: 15 options, 764820000–014
+- Drift from these = investigate before building on top.
+
+## Environment notes added
+
+- Interactive multi-line paste warning dialog: ALWAYS Cancel → the drill.
+- Probe-then-name: column-guessing regex matched "Related Client Code" on
+  "relat" — probes print facts, humans name columns, seeds use names.
+
+## Next (the standing map)
+
+Session record filed → **jobs/workflow spine design** (argument-first,
+hangs off real entities + engagements) → the earn tier. Deferred-rules
+list carried, plus: engagement seed for the 199 living customers ·
+cap_agentregistration when a consumer arrives · extend 00-verify with the
+data baseline above.
+
+---
+
+*Commercial Accounting · session record · demonstration data uses the
+fictitious Harborne family group; real customer names never appear in
+artefacts.*
