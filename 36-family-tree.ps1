@@ -90,6 +90,7 @@ while($q.Count){ $x=$q.Dequeue(); $lx=$level[$x]
     foreach($p in (SetOf $parents $x)){ if(-not $level.ContainsKey($p)){ $level[$p]=$lx-1; $q.Enqueue($p) } }
     foreach($c in (SetOf $children $x)){ if(-not $level.ContainsKey($c)){ $level[$c]=$lx+1; $q.Enqueue($c) } }
     foreach($s in (SetOf $spouses $x)){ if(-not $level.ContainsKey($s)){ $level[$s]=$lx; $q.Enqueue($s) } }
+    foreach($s in (SetOf $exsp $x)){ if(-not $level.ContainsKey($s)){ $level[$s]=$lx; $q.Enqueue($s) } }
     foreach($s in (Sibs $x)){ if(-not $level.ContainsKey($s)){ $level[$s]=$lx; $q.Enqueue($s) } } }
 foreach($id in $cluster){ if(-not $level.ContainsKey($id)){ $level[$id]=9 } }
 
