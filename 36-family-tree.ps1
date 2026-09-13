@@ -99,7 +99,7 @@ $RINGS = "<svg viewBox='0 0 26 14' width='22' height='12' role='img' aria-label=
 # --- person card -------------------------------------------------------------
 function Card($id){
     $e=$byId[$id]; $nm=Esc $e.cap_entityname; $cd=Esc $e.cap_clientcode
-    $st = if($null -ne $e.cap_status -and $stLbl.ContainsKey([int]$e.cap_status)){ $stLbl[[int]$e.cap_status] } else { '' }
+    $st = if($null -ne $e.cap_status -and $stLbl.ContainsKey($e.cap_status)){ $stLbl[$e.cap_status] } else { '' }
     $dead = [bool]$e.cap_dateofdeath
     $dob = if($e.cap_dateofbirth){ ([datetime]$e.cap_dateofbirth).ToString('d MMM yyyy') } else { $null }
     $dod = if($dead){ ([datetime]$e.cap_dateofdeath).ToString('d MMM yyyy') } else { $null }

@@ -60,7 +60,7 @@ function AgeOf($e){ if(-not $e.cap_dateofbirth){ return $null }
     $end = if($e.cap_dateofdeath){ [datetime]$e.cap_dateofdeath } else { Get-Date }
     [math]::Floor(($end - [datetime]$e.cap_dateofbirth).TotalDays/365.25) }
 function Alive($e){ -not $e.cap_dateofdeath -and $e.statecode -eq 0 }
-function StLabel($e){ if($null -ne $e.cap_status -and $stLbl.ContainsKey([int]$e.cap_status)){ $stLbl[[int]$e.cap_status] } else { '' } }
+function StLabel($e){ if($null -ne $e.cap_status -and $stLbl.ContainsKey($e.cap_status)){ $stLbl[$e.cap_status] } else { '' } }
 
 # --- authority edges parsed ---------------------------------------------------
 function Bits($n){
