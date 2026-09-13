@@ -97,7 +97,7 @@ $relMap    = Get-OptionMap 'cap_relationshiptype'
 Ensure-Option 'cap_entitystatus'      'Merged'      ([ref]$statusMap)
 Ensure-Option 'cap_relationshiptype'  'Sibling of'  ([ref]$relMap)
 Ensure-Option 'cap_relationshiptype'  'Relative of' ([ref]$relMap)
-$SYMMETRIC = @('Spouse of','Sibling of','Relative of','Associated with') |
+$SYMMETRIC = @('Spouse of','Sibling of','Relative of','Associated with','Former spouse of') |
     Where-Object { $relMap.ContainsKey($_) } | ForEach-Object { $relMap[$_] }
 
 # --- 0c. cap_dateofdeath column ---------------------------------------------
@@ -298,11 +298,12 @@ foreach ($a in ($actions | Where-Object Action -eq 'ADD-EDGE')) {
 
 # --- 3c. DATE OF DEATH -------------------------------------------------------
 Say "`n-- DATE OF DEATH --" Cyan
-foreach ($a in ($actions | Where-Object Action -eq 'DOD-SET')) {
+foreach ($a in ($actions | Where-Object { $_.Action -in 'DOD-SET','DOB-SET' })) {
+    $fld = if($a.Action -eq 'DOB-SET'){ 'cap_dateofbirth' } else { 'cap_dateofdeath' }
     $e = Resolve $a.SubjectCode "dod"; if (-not $e) { $report.skipped++; continue }
-    Say "  $($a.SubjectCode) $($a.SubjectName): cap_dateofdeath = $($a.Note)"
+    Say "  $($a.SubjectCode) $($a.SubjectName): $fld = $($a.Note)"
     if ($Apply) { Invoke-RestMethod -Headers $H -Method Patch -Uri "$base/cap_entities($($e.cap_entityid))" `
-        -Body (@{ cap_dateofdeath = $a.Note } | ConvertTo-Json) -ContentType "application/json" | Out-Null }
+        -Body (@{ $fld = $a.Note } | ConvertTo-Json) -ContentType "application/json" | Out-Null }
     $report.dodset++
 }
 
