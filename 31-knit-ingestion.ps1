@@ -274,7 +274,11 @@ foreach ($a in ($actions | Where-Object Action -eq 'ADD-EDGE')) {
     $subj = Resolve $a.SubjectCode "add-edge"; $obj = Resolve $a.ObjectCode "add-edge"
     if (-not $subj -or -not $obj) { $report.skipped++; continue }
     $t = $relMap[$a.Verb]
-    $exists = @(Edge-Between $subj.cap_entityid $obj.cap_entityid | Where-Object cap_relationshiptype -eq $t)
+    # direction-aware existence: symmetric types match either way; directed types only subject->object
+    $dirT = $SYMMETRIC -notcontains $t
+    $exists = @($edges | Where-Object { $_.statecode -eq 0 -and $_.cap_relationshiptype -eq $t -and (
+        ($_._cap_fromentityid_value -eq $subj.cap_entityid -and $_._cap_toentityid_value -eq $obj.cap_entityid) -or
+        ((-not $dirT) -and $_._cap_fromentityid_value -eq $obj.cap_entityid -and $_._cap_toentityid_value -eq $subj.cap_entityid)) })
     if ($exists.Count) { Say "  $($a.SubjectCode) $($a.Verb) $($a.ObjectCode) already present" DarkGray; continue }
     Say "  + $($a.SubjectCode) $($a.Verb) $($a.ObjectCode)  ($($a.Note))" Green
     if ($Apply) {
