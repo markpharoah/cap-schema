@@ -32,7 +32,7 @@ Say "=== 34-authority-and-derivation [$mode$(if($Retire){' +RETIRE'})] ===" Cyan
 # --- 1. AUTHORITY VOCABULARY -------------------------------------------------
 function Get-OptionMap($n){ $m=@{}; foreach($o in (Invoke-RestMethod -Headers $H -Uri "$base/GlobalOptionSetDefinitions(Name='$n')").Options){ $m[$o.Label.UserLocalizedLabel.Label]=$o.Value }; $m }
 $relMap = Get-OptionMap 'cap_relationshiptype'
-foreach($label in 'Attorney for (EPOA)','Guardian of','Executor for','Authorised contact for'){
+foreach($label in 'Attorney for (EPOA)','Guardian of','Executor for','Authorised contact for','Medical decision maker for'){
     if($relMap.ContainsKey($label)){ Say "  '$label' already present" DarkGray; continue }
     Say "  option '$label' -> $(if($Apply){'INSERT'}else{'would insert'})" Yellow
     if($Apply){
@@ -41,6 +41,14 @@ foreach($label in 'Attorney for (EPOA)','Guardian of','Executor for','Authorised
         $relMap[$label]=$r.NewOptionValue
     }
 }
+
+# entitystatus gains 'Contact' (known person, never a client) — ruling 2026-09-13 night
+$stMap = Get-OptionMap 'cap_entitystatus'
+if(-not $stMap.ContainsKey('Contact')){
+    Say "  status option 'Contact' -> $(if($Apply){'INSERT'}else{'would insert'})" Yellow
+    if($Apply){
+        $b=@{ OptionSetName='cap_entitystatus'; Label=@{LocalizedLabels=@(@{Label='Contact';LanguageCode=1033})} } | ConvertTo-Json -Depth 6
+        Invoke-RestMethod -Headers $H -Method Post -Uri "$base/InsertOptionValue" -Body $b -ContentType "application/json" | Out-Null } }
 
 # --- 2. LOAD GRAPH -----------------------------------------------------------
 $ents = Get-All "$base/cap_entities?`$select=cap_entityid,cap_clientcode,cap_entityname,cap_status,statecode"

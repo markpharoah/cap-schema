@@ -153,7 +153,41 @@ function Deactivate($set, $id, $why) {
         -Body (@{ statecode = 1; statuscode = 2 } | ConvertTo-Json) -ContentType "application/json" | Out-Null }
 }
 
-$report = [ordered]@{ merged=0; repointed=0; retyped=0; flipped=0; added=0; dodset=0; deactivated=0; deduped=0; statuschanged=0; skipped=0; exceptions=0 }
+$report = [ordered]@{ entityadded=0; merged=0; repointed=0; retyped=0; flipped=0; added=0; dodset=0; deactivated=0; deduped=0; statuschanged=0; skipped=0; exceptions=0 }
+
+# --- 0z. ADD-ENTITY (practice-known people, e.g. FAM-series never-clients) --
+$toAdd = @($actions | Where-Object Action -eq 'ADD-ENTITY')
+if($toAdd.Count){
+    Say "`n-- ADD-ENTITY --" Cyan
+    if(-not $statusMap.ContainsKey('Contact')){
+        Say "  status 'Contact' missing -> $(if($Apply){'INSERT'}else{'would insert'})" Yellow
+        if($Apply){
+            $b=@{ OptionSetName='cap_entitystatus'; Label=@{LocalizedLabels=@(@{Label='Contact';LanguageCode=1033})} } | ConvertTo-Json -Depth 6
+            $r2=Invoke-RestMethod -Headers $H -Method Post -Uri "$base/InsertOptionValue" -Body $b -ContentType "application/json"
+            $statusMap['Contact']=$r2.NewOptionValue } }
+    # probe entity-type lookup nav + Individual type id
+    $typeNav = ((Invoke-RestMethod -Headers $H -Uri ("$base/EntityDefinitions(LogicalName='cap_entity')/ManyToOneRelationships?`$select=ReferencingAttribute,ReferencingEntityNavigationPropertyName,ReferencedEntity")).value |
+        Where-Object ReferencingAttribute -eq 'cap_type')
+    $typeSet = $typeNav.ReferencedEntity + 's'
+    $indiv = (Invoke-RestMethod -Headers $H -Uri "$base/$typeSet`?`$filter=cap_name eq 'Individual'&`$select=$($typeNav.ReferencedEntity)id").value | Select-Object -First 1
+    foreach($a in $toAdd){
+        if($byCode.ContainsKey($a.SubjectCode)){ Say "  $($a.SubjectCode) already exists" DarkGray; continue }
+        Say "  + $($a.SubjectCode) $($a.SubjectName) [Contact] ($($a.Note))" Green
+        if($Apply){
+            $body=@{ cap_entityname=$a.SubjectName; cap_clientcode=$a.SubjectCode }
+            if($statusMap.ContainsKey('Contact')){ $body.cap_status=$statusMap['Contact'] }
+            if($indiv){ $body["$($typeNav.ReferencingEntityNavigationPropertyName)@odata.bind"]="/$typeSet($($indiv.("$($typeNav.ReferencedEntity)id")))" }
+            if($a.Note){ $body.cap_notes = $a.Note }
+            $new=Invoke-RestMethod -Headers $H -Method Post -Uri "$base/cap_entities" -Body ($body|ConvertTo-Json) -ContentType "application/json" -ResponseHeadersVariable rh
+            $id = [regex]::Match($rh.'OData-EntityId'[0],'\(([0-9a-f-]+)\)').Groups[1].Value
+            $e=[pscustomobject]@{ cap_entityid=$id; cap_clientcode=$a.SubjectCode; cap_entityname=$a.SubjectName; cap_status=$statusMap['Contact']; cap_notes=$a.Note; statecode=0 }
+        } else {
+            $e=[pscustomobject]@{ cap_entityid=[guid]::NewGuid().ToString(); cap_clientcode=$a.SubjectCode; cap_entityname=$a.SubjectName; cap_status=$null; cap_notes=$a.Note; statecode=0 }
+        }
+        $byCode[$a.SubjectCode]=$e; $script:ents += $e
+        $report.entityadded++
+    }
+}
 
 # --- 1. MERGES ---------------------------------------------------------------
 Say "`n-- MERGES --" Cyan
