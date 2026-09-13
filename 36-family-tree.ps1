@@ -137,6 +137,7 @@ foreach($lv in ($cluster | ForEach-Object { $level[$_] } | Sort-Object -Unique))
 $DIST = @{ 'spouse'=1;'child'=1;'parent'=1;'sibling'=1;
            'former spouse'=1;'grandchild'=2;'grandparent'=2;'child-in-law'=2;'parent-in-law'=2;'sibling-in-law'=2;'step-child'=2;'aunt/uncle'=2;'niece/nephew'=2;
            'cousin'=3;'relative'=3 }
+$fGiven = (($focus.cap_entityname -split ',\s*')[-1]).Trim(); if(-not $fGiven){ $fGiven = $focus.cap_entityname }
 $fSp = @((SetOf $spouses $focus.cap_entityid) | Where-Object { $cluster.Contains($_) })
 $fEx = @((SetOf $exsp $focus.cap_entityid) | Where-Object { $cluster.Contains($_) })
 $cols=@{1=@();2=@();3=@()}
@@ -156,8 +157,8 @@ $colLbl = @{1='Immediate';2='Close';3='Extended'}
 $focalCols = ""
 foreach($d in 1,2,3){ if($cols[$d].Count){
     $focalCols += "<div class='fcol'><div class='genlabel'>$($colLbl[$d])</div>$($cols[$d] -join '')</div>" } }
-$spStack = ($fSp | ForEach-Object { "<div class='knot' title='Spouse'>$RINGS</div>" + (Card $_) }) -join ''
-$spStack += ($fEx | ForEach-Object { "<div class='knot' title='Former spouse'>$RINGSX</div>" + (Card $_) }) -join ''
+$spStack = ($fSp | ForEach-Object { "<div class='klink' title='Spouse'>$RINGS<span>spouse of $fGiven</span></div>" + (Card $_) }) -join ''
+$spStack += ($fEx | ForEach-Object { "<div class='klink' title='Former spouse'>$RINGSX<span>former spouse of $fGiven</span></div>" + (Card $_) }) -join ''
 $focalHtml = "<div class='focalwrap'><div class='fcol fanchor'><div class='genlabel'>Focal</div>$(Card $focus.cap_entityid)$spStack</div>$focalCols</div>"
 
 # --- authority panel ---------------------------------------------------------
@@ -210,8 +211,9 @@ h1{font-size:22px;margin:14px 0 2px}.sub{color:var(--grey);font-size:9px}
 .couple{display:flex;align-items:center;gap:6px;border:1px solid var(--hair);border-radius:4px;padding:6px;background:#fff}
 .cstack{display:flex;flex-direction:column;gap:2px;border:1px solid var(--hair);border-radius:4px;padding:6px;background:#fff}
 .knot{color:var(--grey);line-height:0;text-align:center;padding:1px 2px;cursor:default}
-.cstack .knot svg,.fanchor .knot svg{transform:rotate(90deg)}
-.cstack .knot,.fanchor .knot{padding:5px 0}
+.cstack .knot svg{transform:rotate(90deg)}
+.cstack .knot{padding:5px 0}
+.klink{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--caption);font-size:7.5px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;padding:5px 0}
 .person{border:1px solid var(--hair);border-left:4px solid var(--hair);border-radius:3px;background:#fff;padding:8px 10px;min-width:172px}
 .person.focal{border-left-color:var(--red)}
 .person.deceased .pname{color:var(--grey)}
