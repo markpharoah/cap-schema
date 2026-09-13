@@ -90,6 +90,8 @@ while($q.Count){ $x=$q.Dequeue(); $lx=$level[$x]
     foreach($s in (Sibs $x)){ if(-not $level.ContainsKey($s)){ $level[$s]=$lx; $q.Enqueue($s) } } }
 foreach($id in $cluster){ if(-not $level.ContainsKey($id)){ $level[$id]=9 } }
 
+$RINGS = "<svg viewBox='0 0 26 14' width='22' height='12' role='img' aria-label='Spouse'><circle cx='9' cy='7' r='5' fill='none' stroke='#666666' stroke-width='1.5'/><circle cx='17' cy='7' r='5' fill='none' stroke='#666666' stroke-width='1.5'/></svg>"
+
 # --- person card -------------------------------------------------------------
 function Card($id){
     $e=$byId[$id]; $nm=Esc $e.cap_entityname; $cd=Esc $e.cap_clientcode
@@ -119,12 +121,38 @@ foreach($lv in ($cluster | ForEach-Object { $level[$_] } | Sort-Object -Unique))
         if($done.Contains($id)){ continue }
         $sp = @((SetOf $spouses $id) | Where-Object { $ids -contains $_ -and -not $done.Contains($_) }) | Select-Object -First 1
         if($sp){ [void]$done.Add($id); [void]$done.Add($sp)
-            $units += "<div class='couple'>$(Card $id)<div class='knot'>⚭</div>$(Card $sp)</div>" }
-        else { [void]$done.Add($id); $units += (Card $id) }
+            $a=$id; $b=$sp; if($b -eq $focus.cap_entityid){ $a=$sp; $b=$id }
+            $units += [pscustomobject]@{ f=($a -eq $focus.cap_entityid); h="<div class='couple'>$(Card $a)<div class='knot' title='Spouse'>$RINGS</div>$(Card $b)</div>" } }
+        else { [void]$done.Add($id); $units += [pscustomobject]@{ f=($id -eq $focus.cap_entityid); h=(Card $id) } }
     }
     $lbl = switch([int]$lv){ {$_ -lt 0}{"Generation up $(-$lv)"} 0{"Focal generation"} 9{"Connected"} default{"Generation down $lv"} }
-    $genHtml += "<div class='genlabel'>$lbl</div><div class='genrow'>$($units -join '')</div>"
+    $genHtml += "<div class='genlabel'>$lbl</div><div class='genrow'>$((($units | Sort-Object { -[int]$_.f }) | ForEach-Object h) -join '')</div>"
 }
+
+# --- focal (left-anchored) view: columns by kinship distance ------------------
+$DIST = @{ 'spouse'=1;'child'=1;'parent'=1;'sibling'=1;
+           'grandchild'=2;'grandparent'=2;'child-in-law'=2;'parent-in-law'=2;'sibling-in-law'=2;'step-child'=2;'aunt/uncle'=2;'niece/nephew'=2;
+           'cousin'=3;'relative'=3 }
+$fSp = @((SetOf $spouses $focus.cap_entityid) | Where-Object { $cluster.Contains($_) })
+$cols=@{1=@();2=@();3=@()}
+$cdone=New-Object System.Collections.Generic.HashSet[string]
+foreach($id in ($cluster | Where-Object { $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ } | Sort-Object { $byId[$_].cap_entityname })){
+    if($cdone.Contains($id)){ continue }
+    $d = $DIST[(RelTo $id)]; if(-not $d){ $d = 3 }
+    $sp = @((SetOf $spouses $id) | Where-Object { $cluster.Contains($_) -and $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ -and -not $cdone.Contains($_) }) | Select-Object -First 1
+    if($sp){
+        $ds = $DIST[(RelTo $sp)]; if(-not $ds){ $ds = 3 }
+        $top=$id; $bot=$sp; if($ds -lt $d){ $top=$sp; $bot=$id; $d=$ds }
+        [void]$cdone.Add($top); [void]$cdone.Add($bot)
+        $cols[$d] += "<div class='cstack'>$(Card $top)<div class='knot' title='Spouse'>$RINGS</div>$(Card $bot)</div>"
+    } else { [void]$cdone.Add($id); $cols[$d] += (Card $id) }
+}
+$colLbl = @{1='Immediate';2='Close';3='Extended'}
+$focalCols = ""
+foreach($d in 1,2,3){ if($cols[$d].Count){
+    $focalCols += "<div class='fcol'><div class='genlabel'>$($colLbl[$d])</div>$($cols[$d] -join '')</div>" } }
+$spStack = ($fSp | ForEach-Object { "<div class='knot' title='Spouse'>$RINGS</div>" + (Card $_) }) -join ''
+$focalHtml = "<div class='focalwrap'><div class='fcol fanchor'><div class='genlabel'>Focal</div>$(Card $focus.cap_entityid)$spStack</div>$focalCols</div>"
 
 # --- authority panel ---------------------------------------------------------
 function NoteBits($n){
@@ -174,7 +202,10 @@ h1{font-size:22px;margin:14px 0 2px}.sub{color:var(--grey);font-size:9px}
 .genlabel{font-size:8.5px;font-weight:bold;letter-spacing:1.4px;text-transform:uppercase;color:var(--caption);margin:14px 0 6px}
 .genrow{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch}
 .couple{display:flex;align-items:center;gap:6px;border:1px solid var(--hair);border-radius:4px;padding:6px;background:#fff}
-.knot{color:var(--grey);font-size:13px}
+.cstack{display:flex;flex-direction:column;gap:2px;border:1px solid var(--hair);border-radius:4px;padding:6px;background:#fff}
+.knot{color:var(--grey);line-height:0;text-align:center;padding:1px 2px;cursor:default}
+.cstack .knot svg,.fanchor .knot svg{transform:rotate(90deg)}
+.cstack .knot,.fanchor .knot{padding:5px 0}
 .person{border:1px solid var(--hair);border-left:4px solid var(--hair);border-radius:3px;background:#fff;padding:8px 10px;min-width:172px}
 .person.focal{border-left-color:var(--red)}
 .person.deceased .pname{color:var(--grey)}
@@ -191,6 +222,15 @@ table.auth tr:nth-child(even) td{background:var(--panel)}
 .trig{font-size:7.5px;color:var(--caption);margin-top:2px}
 .draftflag{display:inline-block;background:var(--highlight);border:1px solid var(--red);padding:1px 6px;font-size:7.3px;font-weight:bold;margin:1px 4px 1px 0}
 .tick{display:inline-block;color:var(--green);font-family:"DejaVu Sans",sans-serif;font-size:8px;font-weight:bold;margin:1px 0}
+.viewtoggle{float:right;margin-top:-34px}
+.viewtoggle button{background:var(--panel);border:1px solid var(--red);color:var(--ink);font-weight:bold;font-size:8.5px;letter-spacing:.6px;padding:4px 12px;border-radius:2px;min-width:110px;cursor:pointer;font-family:inherit}
+.viewtoggle button:focus{outline:none;box-shadow:0 0 0 2px rgba(250,2,23,.12)}
+.viewtoggle button.on{color:var(--red)}
+.focalwrap{display:flex;gap:18px;align-items:flex-start}
+.fcol{display:flex;flex-direction:column;gap:10px;min-width:190px;border-left:1px solid var(--hair);padding-left:14px}
+.fcol.fanchor{border-left:none;padding-left:0}
+.fanchor .person{border-left:4px solid var(--red);min-width:200px}
+#view-dynasty{display:none}
 footer{margin-top:26px;color:var(--caption);font-size:7.3px;border-top:1px solid var(--hair);padding-top:8px}
 </style></head><body>
 <div class="wordmark">commercial <span class="dot">●</span> ACCOUNTING</div>
@@ -199,7 +239,20 @@ footer{margin-top:26px;color:var(--caption);font-size:7.3px;border-top:1px solid
 <div class="meta">Focal: $(Esc $FocusCode) · generated $today · $($cluster.Count) people · walker consumer 2</div>
 <div class="note"><b>PRACTICE EYES ONLY.</b> Default-deny doctrine: partner discretion/approval gates every disclosure. This view informs the partner's judgment; it never automates disclosure or action. Draft instruments are flagged and not to be relied upon.</div>
 <div class="banner">Family web</div>
-$genHtml
+<div class="viewtoggle">
+  <button id="btn-focal" class="on" onclick="setView('focal')">FOCAL VIEW</button>
+  <button id="btn-dynasty" onclick="setView('dynasty')">DYNASTY VIEW</button>
+</div>
+<div id="view-focal">$focalHtml</div>
+<div id="view-dynasty">$genHtml</div>
+<script>
+function setView(v){
+  document.getElementById('view-focal').style.display   = v==='focal'   ? 'block' : 'none';
+  document.getElementById('view-dynasty').style.display = v==='dynasty' ? 'block' : 'none';
+  document.getElementById('btn-focal').classList.toggle('on', v==='focal');
+  document.getElementById('btn-dynasty').classList.toggle('on', v==='dynasty');
+}
+</script>
 $authHtml
 <footer>Commercial Accounting · CAP protection panel · derived relations computed from the primary spine at generation time — nothing stored twice. Logo is the typographic stand-in (brand_logo.png pending).</footer>
 </body></html>
