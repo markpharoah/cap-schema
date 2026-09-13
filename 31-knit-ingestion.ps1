@@ -165,21 +165,30 @@ if($toAdd.Count){
             $b=@{ OptionSetName='cap_entitystatus'; Label=@{LocalizedLabels=@(@{Label='Contact';LanguageCode=1033})} } | ConvertTo-Json -Depth 6
             $r2=Invoke-RestMethod -Headers $H -Method Post -Uri "$base/InsertOptionValue" -Body $b -ContentType "application/json"
             $statusMap['Contact']=$r2.NewOptionValue } }
-    # probe entity-type lookup by REFERENCED entity (never assume the attribute name),
-    # and take set/key/name from EntityDefinitions (never string-glue plurals)
-    $typeRel = ((Invoke-RestMethod -Headers $H -Uri ("$base/EntityDefinitions(LogicalName='cap_entity')/ManyToOneRelationships?`$select=ReferencingAttribute,ReferencingEntityNavigationPropertyName,ReferencedEntity")).value |
-        Where-Object ReferencedEntity -eq 'cap_entitytype' | Select-Object -First 1)
-    if(-not $typeRel){ throw "cap_entity -> cap_entitytype lookup not found - stop (entity type is required; will not half-create)." }
-    $etDef = Invoke-RestMethod -Headers $H -Uri "$base/EntityDefinitions(LogicalName='cap_entitytype')?`$select=EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute"
-    $indiv = (Invoke-RestMethod -Headers $H -Uri ("$base/" + $etDef.EntitySetName + "?`$filter=" + $etDef.PrimaryNameAttribute + " eq 'Individual'&`$select=" + $etDef.PrimaryIdAttribute)).value | Select-Object -First 1
-    if(-not $indiv){ throw "Entity type 'Individual' not found in $($etDef.EntitySetName) - stop." }
+    # cap_type is a CHOICE (global option set cap_entitytype) — same species as cap_status.
+    # Resolve 'Individual' by label; fall back to a lookup probe only if the choice doesn't exist.
+    $indivVal = $null; $typeIsChoice = $true
+    try {
+        $etOpts = (Invoke-RestMethod -Headers $H -Uri "$base/GlobalOptionSetDefinitions(Name='cap_entitytype')").Options
+        $indivVal = ($etOpts | Where-Object { $_.Label.UserLocalizedLabel.Label -eq 'Individual' }).Value
+    } catch { $typeIsChoice = $false }
+    if($typeIsChoice -and $null -eq $indivVal){ throw "Choice cap_entitytype has no 'Individual' option - stop." }
+    if(-not $typeIsChoice){
+        $typeRel = ((Invoke-RestMethod -Headers $H -Uri ("$base/EntityDefinitions(LogicalName='cap_entity')/ManyToOneRelationships?`$select=ReferencingAttribute,ReferencingEntityNavigationPropertyName,ReferencedEntity")).value |
+            Where-Object ReferencedEntity -eq 'cap_entitytype' | Select-Object -First 1)
+        if(-not $typeRel){ throw "cap_entitytype is neither a choice nor a lookup target - stop." }
+        $etDef = Invoke-RestMethod -Headers $H -Uri "$base/EntityDefinitions(LogicalName='cap_entitytype')?`$select=EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute"
+        $indiv = (Invoke-RestMethod -Headers $H -Uri ("$base/" + $etDef.EntitySetName + "?`$filter=" + $etDef.PrimaryNameAttribute + " eq 'Individual'&`$select=" + $etDef.PrimaryIdAttribute)).value | Select-Object -First 1
+        if(-not $indiv){ throw "Entity type 'Individual' not found - stop." }
+    }
     foreach($a in $toAdd){
         if($byCode.ContainsKey($a.SubjectCode)){ Say "  $($a.SubjectCode) already exists" DarkGray; continue }
         Say "  + $($a.SubjectCode) $($a.SubjectName) [Contact] ($($a.Note))" Green
         if($Apply){
             $body=@{ cap_entityname=$a.SubjectName; cap_clientcode=$a.SubjectCode }
             if($statusMap.ContainsKey('Contact')){ $body.cap_status=$statusMap['Contact'] }
-            $body["$($typeRel.ReferencingEntityNavigationPropertyName)@odata.bind"]="/$($etDef.EntitySetName)($($indiv.($etDef.PrimaryIdAttribute)))"
+            if($typeIsChoice){ $body.cap_type = $indivVal }
+            else { $body["$($typeRel.ReferencingEntityNavigationPropertyName)@odata.bind"]="/$($etDef.EntitySetName)($($indiv.($etDef.PrimaryIdAttribute)))" }
             if($a.Note){ $body.cap_notes = $a.Note }
             $new=Invoke-RestMethod -Headers $H -Method Post -Uri "$base/cap_entities" -Body ($body|ConvertTo-Json) -ContentType "application/json" -ResponseHeadersVariable rh
             $id = [regex]::Match($rh.'OData-EntityId'[0],'\(([0-9a-f-]+)\)').Groups[1].Value
