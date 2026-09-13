@@ -34,11 +34,11 @@ $hasNotes = $true
 try { Invoke-RestMethod -Headers $H -Uri "$base/EntityDefinitions(LogicalName='cap_entityrelationship')/Attributes(LogicalName='cap_notes')?`$select=LogicalName" | Out-Null } catch { $hasNotes=$false }
 $edges = Get-All ("$base/cap_entityrelationships?`$select=_cap_fromentityid_value,_cap_toentityid_value,cap_relationshiptype" + $(if($hasNotes){",cap_notes"}) + "&`$filter=statecode eq 0")
 
-$KIN = @('Spouse of','Child of','Parent of','Sibling of')
+$KIN = @('Spouse of','Child of','Parent of','Sibling of','Former spouse of')
 $AUTH = @('Attorney for (EPOA)','Guardian of','Executor for','Authorised contact for','Medical decision maker for')
 
 # --- kinship spine + cluster BFS --------------------------------------------
-$parents=@{}; $children=@{}; $spouses=@{}; $sibsX=@{}; $adj=@{}
+$parents=@{}; $children=@{}; $spouses=@{}; $exsp=@{}; $sibsX=@{}; $adj=@{}
 function AddTo([hashtable]$h,$k,$v){ if(-not $h.ContainsKey($k)){ $h[$k]=New-Object System.Collections.Generic.HashSet[string] }; [void]$h[$k].Add($v) }
 foreach($ed in $edges){
     $f=$ed._cap_fromentityid_value; $t=$ed._cap_toentityid_value
@@ -46,6 +46,7 @@ foreach($ed in $edges){
         'Child of'   { AddTo $parents $f $t; AddTo $children $t $f; AddTo $adj $f $t; AddTo $adj $t $f }
         'Parent of'  { AddTo $parents $t $f; AddTo $children $f $t; AddTo $adj $f $t; AddTo $adj $t $f }
         'Spouse of'  { AddTo $spouses $f $t; AddTo $spouses $t $f; AddTo $adj $f $t; AddTo $adj $t $f }
+        'Former spouse of' { AddTo $exsp $f $t; AddTo $exsp $t $f; AddTo $adj $f $t; AddTo $adj $t $f }
         'Sibling of' { AddTo $sibsX $f $t;  AddTo $sibsX $t $f;  AddTo $adj $f $t; AddTo $adj $t $f }
     }
 }
@@ -64,6 +65,7 @@ function RelTo($a){   # what is A to FOCUS
     $b=$focus.cap_entityid
     if($a -eq $b){ return 'focal person' }
     if((SetOf $spouses $b) -contains $a){ return 'spouse' }
+    if((SetOf $exsp $b) -contains $a){ return 'former spouse' }
     if((SetOf $children $b) -contains $a){ return 'child' }
     if((SetOf $parents $b) -contains $a){ return 'parent' }
     if((Sibs $b) -contains $a){ return 'sibling' }
@@ -74,6 +76,7 @@ function RelTo($a){   # what is A to FOCUS
     foreach($sp in (SetOf $spouses $b)){ if((Sibs $sp) -contains $a){ return 'sibling-in-law' }
         if((SetOf $parents $sp) -contains $a){ return 'parent-in-law' }
         if(((SetOf $children $sp) -contains $a) -and -not ((SetOf $children $b) -contains $a)){ return 'step-child' } }
+    foreach($xp in (SetOf $exsp $b)){ if(((SetOf $children $xp) -contains $a) -and -not ((SetOf $children $b) -contains $a)){ return 'step-child' } }
     foreach($p in (SetOf $parents $b)){ foreach($ps in (Sibs $p)){ if($ps -eq $a){ return 'aunt/uncle' }
         foreach($c in (SetOf $children $ps)){ if($c -eq $a){ return 'cousin' } } } }
     foreach($s in (Sibs $b)){ foreach($c in (SetOf $children $s)){ if($c -eq $a){ return 'niece/nephew' } } }
@@ -90,6 +93,7 @@ while($q.Count){ $x=$q.Dequeue(); $lx=$level[$x]
     foreach($s in (Sibs $x)){ if(-not $level.ContainsKey($s)){ $level[$s]=$lx; $q.Enqueue($s) } } }
 foreach($id in $cluster){ if(-not $level.ContainsKey($id)){ $level[$id]=9 } }
 
+$RINGSX = "<svg viewBox='0 0 26 14' width='22' height='12' role='img' aria-label='Former spouse'><circle cx='9' cy='7' r='5' fill='none' stroke='#909090' stroke-width='1.5' stroke-dasharray='3 2'/><circle cx='17' cy='7' r='5' fill='none' stroke='#909090' stroke-width='1.5' stroke-dasharray='3 2'/></svg>"
 $RINGS = "<svg viewBox='0 0 26 14' width='22' height='12' role='img' aria-label='Spouse'><circle cx='9' cy='7' r='5' fill='none' stroke='#666666' stroke-width='1.5'/><circle cx='17' cy='7' r='5' fill='none' stroke='#666666' stroke-width='1.5'/></svg>"
 
 # --- person card -------------------------------------------------------------
@@ -131,12 +135,13 @@ foreach($lv in ($cluster | ForEach-Object { $level[$_] } | Sort-Object -Unique))
 
 # --- focal (left-anchored) view: columns by kinship distance ------------------
 $DIST = @{ 'spouse'=1;'child'=1;'parent'=1;'sibling'=1;
-           'grandchild'=2;'grandparent'=2;'child-in-law'=2;'parent-in-law'=2;'sibling-in-law'=2;'step-child'=2;'aunt/uncle'=2;'niece/nephew'=2;
+           'former spouse'=1;'grandchild'=2;'grandparent'=2;'child-in-law'=2;'parent-in-law'=2;'sibling-in-law'=2;'step-child'=2;'aunt/uncle'=2;'niece/nephew'=2;
            'cousin'=3;'relative'=3 }
 $fSp = @((SetOf $spouses $focus.cap_entityid) | Where-Object { $cluster.Contains($_) })
+$fEx = @((SetOf $exsp $focus.cap_entityid) | Where-Object { $cluster.Contains($_) })
 $cols=@{1=@();2=@();3=@()}
 $cdone=New-Object System.Collections.Generic.HashSet[string]
-foreach($id in ($cluster | Where-Object { $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ } | Sort-Object { $byId[$_].cap_entityname })){
+foreach($id in ($cluster | Where-Object { $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ -and $fEx -notcontains $_ } | Sort-Object { $byId[$_].cap_entityname })){
     if($cdone.Contains($id)){ continue }
     $d = $DIST[(RelTo $id)]; if(-not $d){ $d = 3 }
     $sp = @((SetOf $spouses $id) | Where-Object { $cluster.Contains($_) -and $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ -and -not $cdone.Contains($_) }) | Select-Object -First 1
@@ -152,6 +157,7 @@ $focalCols = ""
 foreach($d in 1,2,3){ if($cols[$d].Count){
     $focalCols += "<div class='fcol'><div class='genlabel'>$($colLbl[$d])</div>$($cols[$d] -join '')</div>" } }
 $spStack = ($fSp | ForEach-Object { "<div class='knot' title='Spouse'>$RINGS</div>" + (Card $_) }) -join ''
+$spStack += ($fEx | ForEach-Object { "<div class='knot' title='Former spouse'>$RINGSX</div>" + (Card $_) }) -join ''
 $focalHtml = "<div class='focalwrap'><div class='fcol fanchor'><div class='genlabel'>Focal</div>$(Card $focus.cap_entityid)$spStack</div>$focalCols</div>"
 
 # --- authority panel ---------------------------------------------------------

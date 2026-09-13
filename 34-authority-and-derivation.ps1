@@ -32,7 +32,7 @@ Say "=== 34-authority-and-derivation [$mode$(if($Retire){' +RETIRE'})] ===" Cyan
 # --- 1. AUTHORITY VOCABULARY -------------------------------------------------
 function Get-OptionMap($n){ $m=@{}; foreach($o in (Invoke-RestMethod -Headers $H -Uri "$base/GlobalOptionSetDefinitions(Name='$n')").Options){ $m[$o.Label.UserLocalizedLabel.Label]=$o.Value }; $m }
 $relMap = Get-OptionMap 'cap_relationshiptype'
-foreach($label in 'Attorney for (EPOA)','Guardian of','Executor for','Authorised contact for','Medical decision maker for'){
+foreach($label in 'Attorney for (EPOA)','Guardian of','Executor for','Authorised contact for','Medical decision maker for','Former spouse of'){
     if($relMap.ContainsKey($label)){ Say "  '$label' already present" DarkGray; continue }
     Say "  option '$label' -> $(if($Apply){'INSERT'}else{'would insert'})" Yellow
     if($Apply){
@@ -59,7 +59,7 @@ Say ("Graph: " + $ents.Count + " entities, " + $edges.Count + " active edges")
 
 # --- 3. BUILD PRIMARY SPINE --------------------------------------------------
 # Convention: edge reads FROM <type> TO. "Child of": FROM is child, TO parent.
-$parents=@{}; $children=@{}; $spouses=@{}; $sibsX=@{}   # explicit sibling
+$parents=@{}; $children=@{}; $spouses=@{}; $exsp=@{}; $sibsX=@{}   # explicit sibling
 function AddTo([hashtable]$h,$k,$v){ if(-not $h.ContainsKey($k)){ $h[$k]=New-Object System.Collections.Generic.HashSet[string] }; [void]$h[$k].Add($v) }
 foreach($ed in $edges){
     $f=$ed._cap_fromentityid_value; $t=$ed._cap_toentityid_value
@@ -67,6 +67,7 @@ foreach($ed in $edges){
         'Child of'   { AddTo $parents $f $t; AddTo $children $t $f }
         'Parent of'  { AddTo $parents $t $f; AddTo $children $f $t }
         'Spouse of'  { AddTo $spouses $f $t; AddTo $spouses $t $f }
+        'Former spouse of' { AddTo $exsp $f $t; AddTo $exsp $t $f }
         'Sibling of' { AddTo $sibsX $f $t;  AddTo $sibsX $t $f }
     }
 }
@@ -102,7 +103,7 @@ function DeriveClean($a,$b){
         foreach($s in (Sibs $sp)){ if($s -eq $b){ return 'sibling-in-law' }
             if((SetOf $spouses $s) -contains $b){ return 'sibling-in-law (spouse)' } } }
     foreach($c in (SetOf $children $a)){ if((SetOf $spouses $c) -contains $b){ return 'child-in-law' } }
-    foreach($p in (SetOf $parents $a)){ foreach($sp in (SetOf $spouses $p)){
+    foreach($p in (SetOf $parents $a)){ foreach($sp in (@(SetOf $spouses $p) + @(SetOf $exsp $p))){
         if($sp -eq $b -and -not ((SetOf $parents $a) -contains $b)){ return 'step-parent' } } }
     foreach($c in (SetOf $children $a)){ foreach($cp in (SetOf $parents $c)){
         if($cp -ne $a -and -not ((SetOf $spouses $a) -contains $cp)){ } } }  # reserved: blended-family v2

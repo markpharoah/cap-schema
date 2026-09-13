@@ -88,7 +88,7 @@ foreach($e in ($ents | Where-Object { (Alive $_) -and $_.cap_dateofbirth })){
     $mine = @($authEdges | Where-Object principal -eq $e.cap_entityid)
     $types = @($mine | ForEach-Object type | Sort-Object -Unique)
     $kinIds = @((SetOf $adj $e.cap_entityid) | Where-Object { $byId[$_] -and (Alive $byId[$_]) })
-    $elders += [pscustomobject]@{ e=$e; age=$age; types=$types; nInstr=$types.Count; kin=$kinIds.Count; draft=@($mine | Where-Object { $_.bits.draft }).Count -gt 0 }
+    $elders += [pscustomobject]@{ e=$e; age=$age; st=(StLabel $e); types=$types; nInstr=$types.Count; kin=$kinIds.Count; draft=@($mine | Where-Object { $_.bits.draft }).Count -gt 0 }
     # (a) concentration per type: sole operative holder who is only/dominant kin
     foreach($ty in $types){
         $ops = @($mine | Where-Object { $_.type -eq $ty -and $_.bits.state -eq 'OPERATIVE' })
@@ -128,7 +128,7 @@ Say "`n-- ELDER REGISTER (>= $ElderThreshold) --" Cyan
 foreach($el in ($elders | Sort-Object { -$_.age })){
     $instr = if($el.nInstr){ ($el.types -join ', ') + $(if($el.draft){ '  [DRAFT]' }) } else { 'NONE ON FILE' }
     $col = if($el.nInstr){ 'Gray' } else { 'Yellow' }
-    Say ("  {0,3}  {1,-8} {2,-28} kin:{3}  {4}" -f $el.age, $el.e.cap_clientcode, $el.e.cap_entityname, $el.kin, $instr) $col }
+    Say ("  {0,3}  {1,-8} {2,-26} {3,-8} kin:{4}  {5}" -f $el.age, $el.e.cap_clientcode, $el.e.cap_entityname, $el.st, $el.kin, $instr) $col }
 Say "`n-- (a) CONCENTRATION --" Cyan
 if($findA.Count){ foreach($f in $findA){ Say ("  !! {0} ({1}) — sole operative {2}: {3}; other living kin: {4}{5}" -f $f.p.cap_entityname,$f.age,$f.type,$f.h.cap_entityname,$f.otherKin,$(if($f.draft){' [DRAFT]'})) Yellow } } else { Say "  clear" Green }
 Say "-- (b) STRANGER AUTHORITY --" Cyan
@@ -140,7 +140,7 @@ if($findC.Count){ foreach($f in $findC){ Say ("  [{0}] {1} -> {2} ({3}): {4}" -f
 function Row($cells){ "<tr>" + (($cells | ForEach-Object { "<td>$_</td>" }) -join '') + "</tr>" }
 $eldRows = ($elders | Sort-Object { -$_.age } | ForEach-Object {
     $instr = if($_.nInstr){ (Esc ($_.types -join ', ')) + $(if($_.draft){ " <span class='draftflag'>DRAFT</span>" }) } else { "<span class='nonef'>NONE ON FILE</span>" }
-    Row @($_.age, (Esc $_.e.cap_clientcode), (Esc $_.e.cap_entityname), $_.kin, $instr) }) -join "`n"
+    Row @($_.age, (Esc $_.e.cap_clientcode), (Esc $_.e.cap_entityname), (Esc $_.st), $_.kin, $instr) }) -join "`n"
 $aRows = if($findA.Count){ ($findA | ForEach-Object { Row @((Esc $_.p.cap_entityname), $_.age, (Esc $_.type), (Esc $_.h.cap_entityname), $_.otherKin, $(if($_.draft){"<span class='draftflag'>DRAFT</span>"}else{''})) }) -join "`n" } else { "<tr><td colspan='6' class='clear'>Clear — no concentration findings at threshold $ElderThreshold.</td></tr>" }
 $bRows = if($findB.Count){ ($findB | ForEach-Object { Row @((Esc $_.h.cap_entityname), (Esc $_.type), (Esc $_.p.cap_entityname), $(if($_.draft){"<span class='draftflag'>DRAFT</span>"}else{''})) }) -join "`n" } else { "<tr><td colspan='4' class='clear'>Clear — every authority holder is kin or professionally marked.</td></tr>" }
 $cRows = if($findC.Count){ ($findC | ForEach-Object { Row @("<b class='$(if($_.sev -eq 'RED'){'red'}else{'amber'})'>$($_.sev)</b>", (Esc $_.h.cap_entityname), (Esc $_.type), (Esc $_.p.cap_entityname), (Esc $_.why)) }) -join "`n" } else { "<tr><td colspan='5' class='clear'>Clear — no orphaned authority.</td></tr>" }
@@ -171,7 +171,7 @@ footer{margin-top:26px;color:var(--caption);font-size:7.3px;border-top:1px solid
 <div class="meta">Generated $today · elder threshold $ElderThreshold · $($ents.Count) entities · $($authEdges.Count) authority edges · read-only</div>
 <div class="note"><b>PRACTICE EYES ONLY.</b> Default-deny doctrine: partner discretion/approval gates every disclosure. This report informs the partner's judgment; it never automates disclosure or action. Draft instruments are counted but flagged.</div>
 <div class="banner">Elder register (&ge; $ElderThreshold)</div>
-<table><thead><tr><th>Age</th><th>Code</th><th>Name</th><th>Living kin links</th><th>Instruments on file</th></tr></thead><tbody>
+<table><thead><tr><th>Age</th><th>Code</th><th>Name</th><th>Status</th><th>Living kin links</th><th>Instruments on file</th></tr></thead><tbody>
 $eldRows
 </tbody></table>
 <div class="banner">(a) Concentration</div>
