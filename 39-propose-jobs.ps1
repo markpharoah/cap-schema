@@ -31,15 +31,20 @@ foreach ($e in $eng) { if ($e.cap_entityid.cap_clientcode) { $noAS += $e.cap_ent
 $noAS = $noAS | Select-Object -Unique
 
 # --- newest all-status export ---
-$file = Get-ChildItem "$PSScriptRoot\data\lodgeit-allstatus-*.xlsx" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $file) { throw "No 'lodgeit-allstatus-*.xlsx' found in $PSScriptRoot\data" }
+$file = Get-ChildItem "$PSScriptRoot\data\Tax Returns*.xlsx" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $file) { throw "No 'Tax Returns*.xlsx' found in $PSScriptRoot\data" }
 Write-Host "Reading $($file.Name) ($('{0:dd/MM/yyyy HH:mm}' -f $file.LastWriteTime))" -ForegroundColor Cyan
 $rows = Import-Excel $file.FullName
 $today = (Get-Date).Date
 $RET = 'ITR','CTR','TRT','PTR','SMSFAR'
 $tmplMap = @{ ITR='Tax Only Return'; CTR='Year End'; TRT='Year End'; PTR='Year End'; SMSFAR='Year End (SMSF)' }
 
-function P($v) { if ($v -is [datetime]) { $v.Date } elseif ($v) { [datetime]::ParseExact("$v",'dd/MM/yyyy',$null) } else { $null } }
+$AU = [System.Globalization.CultureInfo]::GetCultureInfo('en-AU')
+function P($v) {
+  if ($v -is [datetime]) { return $v.Date }
+  if (-not $v) { return $null }
+  [datetime]::ParseExact("$v", [string[]]@('d/M/yyyy','dd/MM/yyyy','d/MM/yyyy','dd/M/yyyy'), $AU, 'None').Date
+}
 
 $open = @(); $steward = @()
 foreach ($r in $rows) {
@@ -91,4 +96,3 @@ $props | Group-Object JobClass | ForEach-Object { Write-Host ("{0,-20} {1,4}" -f
 Write-Host ("{0,-20} {1,4}   ({2} forms)" -f 'TOTAL',$props.Count,(($props | Measure-Object FormsFolded -Sum).Sum)) -ForegroundColor Green
 Write-Host ("Stewardship register: {0} out-of-scope obligations" -f $steward.Count) -ForegroundColor Cyan
 Write-Host "`nTick Accept (x) in data\job-proposals.csv, then 40-apply-jobs.ps1." -ForegroundColor Cyan
-
