@@ -58,9 +58,12 @@ foreach ($r in $rows) {
 
 $props = [System.Collections.Generic.List[object]]::new()
 function Add-Prop($class,$tmpl,$o,$period,$due,$folded,$detail) {
+  $ks = if ($o.Start) { $o.Start.ToString('yyyyMMdd') } else { '' }
+  $ke = if ($o.End)   { $o.End.ToString('yyyyMMdd') }   else { '' }
+  $key = "$($o.Code)|$($o.Type)|$ks|$ke|$($o.Amend)"
   $props.Add([pscustomobject]@{ Accept=''; JobClass=$class; Template=$tmpl; ClientCode=$o.Code; ClientName=$o.Name
     EntityType=$o.EType; Period=$period; DueDate=$due; FormsFolded=$folded; FormDetail=$detail
-    Key="$($o.Code)|$($o.Type)|{0:yyyyMMdd}|{1:yyyyMMdd}|$($o.Amend)" -f $o.Start,$o.End }) }
+    Key=$key }) }
 
 foreach ($o in ($open | Where-Object { $_.Amend -gt 0 -and -not $_.Overdue })) {
   Add-Prop 'Amendment' 'Amendment' $o "$($o.Type)/$($o.Sub) $($o.Year) amendment $($o.Amend)" '' 1 "$($o.Type)/$($o.Sub) $($o.Year) [$($o.Status)] amendment" }
@@ -71,8 +74,9 @@ foreach ($g in ($od | Group-Object Code,Year | Sort-Object Name)) {
   $tmpl = if ($f.Type | Where-Object { $_ -in 'CTR','TRT','PTR','SMSFAR' }) { 'Year End' } else { 'Tax Only Return' }
   $detail = ($f | ForEach-Object { "$($_.Type)$(if($_.Sub){"/$($_.Sub)"})$(if($_.Amend){' amd'})" }) -join ' + '
   $o = $f[0]
+  $dd = $o.Due.ToString('dd/MM/yyyy')
   $props.Add([pscustomobject]@{ Accept=''; JobClass='Arrears catch-up'; Template=$tmpl; ClientCode=$o.Code; ClientName=$o.Name
-    EntityType=$o.EType; Period="FY$($o.Year)"; DueDate=('{0:dd/MM/yyyy}' -f $o.Due); FormsFolded=$f.Count; FormDetail=$detail
+    EntityType=$o.EType; Period="FY$($o.Year)"; DueDate=$dd; FormsFolded=$f.Count; FormDetail=$detail
     Key="$($o.Code)|ARREARS|$($o.Year)||0" }) }
 
 foreach ($o in ($open | Where-Object { -not $_.Overdue -and $_.Amend -eq 0 -and $_.Type -in $RET } | Sort-Object Due,Name)) {

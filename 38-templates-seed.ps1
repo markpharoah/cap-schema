@@ -18,6 +18,13 @@ $HW = $H + @{ 'Content-Type'='application/json' }
 $Api = "$Env/api/data/v9.2"
 $Practice = 764820000; $Customer = 764820001
 
+# Navigation property names are case-sensitive and set at relationship
+# creation - never assume, ask metadata (15/9 lesson: 0x80048d19).
+$NavProp = ((Invoke-RestMethod -Uri "$Api/EntityDefinitions(LogicalName='cap_tasktemplate')/ManyToOneRelationships?`$select=ReferencingEntityNavigationPropertyName,ReferencedEntity" -Headers $H).value |
+  Where-Object ReferencedEntity -eq 'cap_jobtemplate').ReferencingEntityNavigationPropertyName
+if (-not $NavProp) { throw 'Could not resolve jobtemplate navigation property from metadata' }
+Write-Host "Lookup navigation property: $NavProp" -ForegroundColor Cyan
+
 $Templates = @(
   @{ Name='Tax Only Return'
      Desc='Individual/simple return: no accounts, straight to LodgeIT. Final task anchors 100% (bill on completion). Ratified Session 37.'
@@ -56,7 +63,7 @@ foreach ($t in $Templates) {
   foreach ($k in $t.Tasks) {
     if ($existing -contains $k.n) { Write-Host "  task '$($k.n)' already exists - skipping" -ForegroundColor Yellow; continue }
     $body = @{ cap_name=$k.n; cap_stagename=$k.st; cap_stagesequence=$k.seq; cap_weight=$k.w
-               cap_court=$k.court; cap_showcustomer=$true; 'cap_jobtemplateid@odata.bind'="/cap_jobtemplates($tid)" }
+               cap_court=$k.court; cap_showcustomer=$true; "$NavProp@odata.bind"="/cap_jobtemplates($tid)" }
     if ($k.ms)     { $body.cap_ismilestone=$true; $body.cap_milestonename=$k.ms }
     if ($k.anchor) { $body.cap_billinganchorpercent=[decimal]$k.anchor }
     Invoke-RestMethod -Method Post -Uri "$Api/cap_tasktemplates" -Headers $HW -Body ($body | ConvertTo-Json) | Out-Null
