@@ -83,6 +83,9 @@ function RelTo($a){   # what is A to FOCUS
     return 'relative'
 }
 
+function DobKey($id){ $e=$byId[$id]; if($e.cap_dateofbirth){ [datetime]$e.cap_dateofbirth } else { [datetime]::MaxValue } }
+function ExKey($id){ if((RelTo $id) -eq 'former spouse'){ 1 } else { 0 } }
+
 # --- generations (levels): parents up, children down, spouses/siblings flat --
 $level=@{}; $level[$focus.cap_entityid]=0
 $q=New-Object System.Collections.Queue; $q.Enqueue($focus.cap_entityid)
@@ -127,11 +130,11 @@ foreach($lv in ($cluster | ForEach-Object { $level[$_] } | Sort-Object -Unique))
         $sp = @((SetOf $spouses $id) | Where-Object { $ids -contains $_ -and -not $done.Contains($_) }) | Select-Object -First 1
         if($sp){ [void]$done.Add($id); [void]$done.Add($sp)
             $a=$id; $b=$sp; if($b -eq $focus.cap_entityid){ $a=$sp; $b=$id }
-            $units += [pscustomobject]@{ f=($a -eq $focus.cap_entityid); h="<div class='couple'>$(Card $a)<div class='knot' title='Spouse'>$RINGS</div>$(Card $b)</div>" } }
-        else { [void]$done.Add($id); $units += [pscustomobject]@{ f=($id -eq $focus.cap_entityid); h=(Card $id) } }
+            $units += [pscustomobject]@{ f=($a -eq $focus.cap_entityid); ex=(ExKey $a); dob=(DobKey $a); nm=$byId[$a].cap_entityname; h="<div class='couple'>$(Card $a)<div class='knot' title='Spouse'>$RINGS</div>$(Card $b)</div>" } }
+        else { [void]$done.Add($id); $units += [pscustomobject]@{ f=($id -eq $focus.cap_entityid); ex=(ExKey $id); dob=(DobKey $id); nm=$byId[$id].cap_entityname; h=(Card $id) } }
     }
     $lbl = switch([int]$lv){ {$_ -lt 0}{"Generation up $(-$lv)"} 0{"Focal generation"} 9{"Connected"} default{"Generation down $lv"} }
-    $genHtml += "<div class='genlabel'>$lbl</div><div class='genrow'>$((($units | Sort-Object { -[int]$_.f }) | ForEach-Object h) -join '')</div>"
+    $genHtml += "<div class='genlabel'>$lbl</div><div class='genrow'>$((($units | Sort-Object { -[int]$_.f }, ex, dob, nm) | ForEach-Object h) -join '')</div>"
 }
 
 # --- focal (left-anchored) view: columns by kinship distance ------------------
@@ -146,14 +149,16 @@ $cdone=New-Object System.Collections.Generic.HashSet[string]
 foreach($id in ($cluster | Where-Object { $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ -and $fEx -notcontains $_ } | Sort-Object { $byId[$_].cap_entityname })){
     if($cdone.Contains($id)){ continue }
     $d = $DIST[(RelTo $id)]; if(-not $d){ $d = 3 }
-    $sp = @((SetOf $spouses $id) | Where-Object { $cluster.Contains($_) -and $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ -and -not $cdone.Contains($_) }) | Select-Object -First 1
+    $sp = @((SetOf $spouses $id) | Where-Object { $cluster.Contains($_) -and $_ -ne $focus.cap_entityid -and $fSp -notcontains $_ -and $fEx -notcontains $_ -and -not $cdone.Contains($_) }) | Select-Object -First 1
     if($sp){
         $ds = $DIST[(RelTo $sp)]; if(-not $ds){ $ds = 3 }
         $top=$id; $bot=$sp; if($ds -lt $d){ $top=$sp; $bot=$id; $d=$ds }
         [void]$cdone.Add($top); [void]$cdone.Add($bot)
-        $cols[$d] += "<div class='cstack'>$(Card $top)<div class='knot' title='Spouse'>$RINGS</div>$(Card $bot)</div>"
-    } else { [void]$cdone.Add($id); $cols[$d] += (Card $id) }
+        $k = @((DobKey $top),(DobKey $bot)) | Sort-Object | Select-Object -First 1
+        $cols[$d] += [pscustomobject]@{ ex=(ExKey $top); dob=$k; nm=$byId[$top].cap_entityname; h="<div class='cstack'>$(Card $top)<div class='knot' title='Spouse'>$RINGS</div>$(Card $bot)</div>" }
+    } else { [void]$cdone.Add($id); $cols[$d] += [pscustomobject]@{ ex=(ExKey $id); dob=(DobKey $id); nm=$byId[$id].cap_entityname; h=(Card $id) } }
 }
+foreach($d in 1,2,3){ $cols[$d] = @($cols[$d] | Sort-Object ex, dob, nm | ForEach-Object h) }
 $colLbl = @{1='Immediate';2='Close';3='Extended'}
 $focalCols = ""
 foreach($d in 1,2,3){ if($cols[$d].Count){
