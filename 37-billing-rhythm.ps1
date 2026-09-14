@@ -14,10 +14,8 @@ $ErrorActionPreference = 'Stop'
 
 # --- auth (house standard; swap this block if your current scripts differ) ---
 $Env    = 'https://org020f7b5c.crm6.dynamics.com'
-$Token  = (Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' `
-          -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' `
-          -Scopes "$Env/.default" -Interactive:$false -Silent -ErrorAction SilentlyContinue) 
-if (-not $Token) { $Token = Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' -Scopes "$Env/.default" -Interactive }
+try   { $Token = Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' -Scopes "$Env/.default" -Silent }
+catch { $Token = Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' -Scopes "$Env/.default" -Interactive }
 $H  = @{ Authorization = "Bearer $($Token.AccessToken)"; 'OData-MaxVersion'='4.0'; 'OData-Version'='4.0'; Accept='application/json' }
 $HW = $H + @{ 'Content-Type'='application/json'; 'MSCRM.SolutionUniqueName'='CommercialAccounting' }
 $Api = "$Env/api/data/v9.2"

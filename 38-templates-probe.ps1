@@ -9,10 +9,8 @@
 # ============================================================================
 $ErrorActionPreference = 'Stop'
 $Env    = 'https://org020f7b5c.crm6.dynamics.com'
-$Token  = (Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' `
-          -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' `
-          -Scopes "$Env/.default" -Interactive:$false -Silent -ErrorAction SilentlyContinue)
-if (-not $Token) { $Token = Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' -Scopes "$Env/.default" -Interactive }
+try   { $Token = Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' -Scopes "$Env/.default" -Silent }
+catch { $Token = Get-MsalToken -ClientId 'bcf0d51c-81f7-40e0-a485-c75ed82a02e3' -TenantId '46bc20d5-9c02-426f-b030-aea373177d31' -Scopes "$Env/.default" -Interactive }
 $H = @{ Authorization = "Bearer $($Token.AccessToken)"; Accept='application/json' }
 $Api = "$Env/api/data/v9.2"
 
