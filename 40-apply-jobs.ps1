@@ -66,10 +66,11 @@ $stamped=0; $skipped=0; $flagged=0
 foreach ($row in $tick) {
   $jobName = "$($row.ClientCode) · $($row.Period)"
   if ($existingJobs.ContainsKey($jobName)) { Write-Host "SKIP  $jobName (exists)" -ForegroundColor Yellow; $skipped++; continue }
-  $tmplName = $row.Template
+  # Proposer shorthand -> real template names (SMSF rides Year End until its own template exists)
+  $alias = @{ 'Year End'='Annual Accounting - Year End'; 'Year End (SMSF)'='Annual Accounting - Year End' }
+  $tmplName = if ($alias.ContainsKey($row.Template)) { $alias[$row.Template] } else { $row.Template }
   if (-not $templates.ContainsKey($tmplName)) {
-    if ($tmplName -eq 'Year End (SMSF)' -and $templates.ContainsKey('Year End')) { $tmplName = 'Year End' }
-    else { Write-Host "FLAG  $jobName - template '$($row.Template)' not found" -ForegroundColor Red; $flagged++; continue } }
+    Write-Host "FLAG  $jobName - template '$($row.Template)' not found" -ForegroundColor Red; $flagged++; continue }
   $ent = (Invoke-RestMethod -Uri "$Api/cap_entities?`$filter=cap_clientcode eq '$($row.ClientCode)'&`$select=cap_entityid,cap_entityname" -Headers $H).value
   if (-not $ent) { Write-Host "FLAG  $jobName - entity not found for $($row.ClientCode)" -ForegroundColor Red; $flagged++; continue }
   $eng = (Invoke-RestMethod -Uri "$Api/cap_engagements?`$filter=_cap_entityid_value eq $($ent[0].cap_entityid)&`$select=cap_engagementid" -Headers $H).value
