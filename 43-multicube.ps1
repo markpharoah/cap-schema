@@ -41,7 +41,7 @@ $etAttr = ((Invoke-RestMethod -Uri "$Api/EntityDefinitions(LogicalName='cap_enti
 if (-not $etAttr) { throw 'Could not find an entity-type picklist on cap_entity' }
 if ($ex) { $eid = $ex[0].cap_entityid }
 else {
-  $body = @{ cap_entityname=$Name; cap_clientcode=$Code; $etAttr=$EntityType }
+  $body = @{ cap_entityname=$Name; cap_clientcode=$Code; $etAttr=$EntityType; cap_status=764820000 }   # Active
   $r = Invoke-RestMethod -Method Post -Uri "$Api/cap_entities" -Headers ($HW + @{ Prefer='return=representation' }) -Body ($body | ConvertTo-Json)
   $eid = $r.cap_entityid; Write-Host "Entity created: $Name [$Code]" -ForegroundColor Green
 }
