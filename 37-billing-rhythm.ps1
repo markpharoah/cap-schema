@@ -72,8 +72,8 @@ Write-Host "`nIf either column was just created, give the validation range a mom
 # --- 3. Data pass -----------------------------------------------------------
 # Retainers by cap_clientcode where LodgeIT knows them; by name-probe where not.
 # CONFIRM the Marbec row: rhythm rides the engagement you actually bill.
-$RhythmByCode = @{ 'ELE0001'=764820001; 'CEL0001'=764820001; 'TRU0001'=764820002 }  # EIV, Celmec monthly; Marbec trust quarterly
-$RhythmByName = @{ 'MultiCube'=764820001; 'Institute of Electrical'=764820001 }      # no LodgeIT code — probe cap_entity by name
+$RhythmByCode = @{ 'ELE0001'=764820001; 'CEL0001'=764820001; 'IEI0003'=764820001; 'TRU0001'=764820002 }  # EIV, Celmec, IEI (Association of Electrical Inspectors) monthly; Marbec trust quarterly
+$RhythmByName = @{ 'MultiCube'=764820001 }      # no LodgeIT code — probe cap_entity by name (entity created by 43)
 $NoAS = @('LEW0003','LEW0005')                                                       # Bill Lewis + W E Lewis & Associates
 
 function Get-EntityByCode($code) {
