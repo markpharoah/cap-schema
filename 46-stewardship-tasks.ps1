@@ -30,15 +30,21 @@ foreach ($e in $eng) {
   $jobs = (Invoke-RestMethod -Uri "$Api/cap_jobs?`$filter=_cap_entityid_value eq $eid and statecode eq 0&`$select=cap_jobid,cap_name" -Headers $H).value
   $lines = if ($reg[$code]) { ($reg[$code] | ForEach-Object { "  $($_.Obligation) $($_.PeriodStart)–$($_.PeriodEnd) due $($_.DueDate)" }) -join "`n" } else { '  (no out-of-scope obligations at last sweep)' }
   $asAt = if ($reg[$code]) { $reg[$code][0].AsAtSweep } else { 'n/a' }
+  $n = ($reg[$code] | Measure-Object).Count
+  if ($n -eq 0) { Write-Host "SKIP  $code - AS scope No but no out-of-scope obligations (no-lodgement engagement, not stewardship)" -ForegroundColor DarkYellow; continue }
   foreach ($j in $jobs) {
     $has = (Invoke-RestMethod -Uri "$Api/cap_tasks?`$filter=_cap_jobid_value eq $($j.cap_jobid) and cap_name eq '$($TaskName.Replace("'","''"))'&`$select=cap_taskid" -Headers $H).value
     if ($has) { Write-Host "SKIP  $($j.cap_name) (task exists)" -ForegroundColor Yellow; $skipped++; continue }
-    if (-not $Apply) { Write-Host "PLAN  $($j.cap_name)  <- $($TaskName) [$(($reg[$code] | Measure-Object).Count) obligations]" -ForegroundColor Green; continue }
+    if (-not $Apply) { Write-Host "PLAN  $($j.cap_name)  <- $($TaskName) [$n obligations]" -ForegroundColor Green; continue }
+    # task is lean (cap_task has no description column); the register lines go on the JOB description
     $body = @{ cap_name=$TaskName; cap_stagename='Stewardship'; cap_stagesequence=0; cap_weight=0; cap_court=$Practice; cap_showcustomer=$false
-      cap_description="Out-of-scope obligations known at sweep $asAt (AS scope = No: we do not prepare these, we advise on them):`n$lines"
       "$NavTaskJob@odata.bind"="/cap_jobs($($j.cap_jobid))" }
     Invoke-RestMethod -Method Post -Uri "$Api/cap_tasks" -Headers $HW -Body ($body | ConvertTo-Json) | Out-Null
-    Write-Host "ADD   $($j.cap_name)  <- $($TaskName)" -ForegroundColor Green; $added++
+    $jd = (Invoke-RestMethod -Uri "$Api/cap_jobs($($j.cap_jobid))?`$select=cap_description" -Headers $H).cap_description
+    if ("$jd" -notmatch 'STEWARDSHIP') {
+      $jd = "$jd`n`nSTEWARDSHIP (as at sweep $asAt) - AS scope No: we do not prepare these, we advise on them:`n$lines"
+      Invoke-RestMethod -Method Patch -Uri "$Api/cap_jobs($($j.cap_jobid))" -Headers $HW -Body (@{ cap_description=$jd } | ConvertTo-Json) | Out-Null }
+    Write-Host "ADD   $($j.cap_name)  <- $($TaskName) ($n obligations noted on job)" -ForegroundColor Green; $added++
   }
 }
 Write-Host "`n46 complete: $added added, $skipped skipped." -ForegroundColor Cyan

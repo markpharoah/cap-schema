@@ -21,5 +21,5 @@ foreach ($t in 'cap_timeentry','cap_budgetline') {
   (Invoke-RestMethod -Uri "$Api/EntityDefinitions(LogicalName='$t')/ManyToOneRelationships?`$select=ReferencingAttribute,ReferencedEntity,ReferencingEntityNavigationPropertyName" -Headers $H).value |
     ForEach-Object { "    {0} -> {1}  (nav {2})" -f $_.ReferencingAttribute, $_.ReferencedEntity, $_.ReferencingEntityNavigationPropertyName }
   Write-Host "  quick-create enabled:" ((Invoke-RestMethod -Uri "$Api/EntityDefinitions(LogicalName='$t')?`$select=IsQuickCreateEnabled" -Headers $H).IsQuickCreateEnabled) -ForegroundColor DarkCyan
-  Write-Host "  rows:" ((Invoke-RestMethod -Uri "$Api/${t}s?`$select=${t}id&`$top=1&`$count=true" -Headers ($H + @{ Prefer='odata.include-annotations="*"' })).'@odata.count') -ForegroundColor DarkCyan
+  Write-Host "  rows:" ((Invoke-RestMethod -Uri "$Api/$(if($t -eq 'cap_timeentry'){'cap_timeentries'}else{$t+'s'})?`$select=${t}id&`$top=1&`$count=true" -Headers ($H + @{ Prefer='odata.include-annotations="*"' })).'@odata.count') -ForegroundColor DarkCyan
 }
