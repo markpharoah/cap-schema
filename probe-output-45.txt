@@ -1,0 +1,52 @@
+
+=== cap_timeentry ===
+cap_chargeable                           Boolean      ApplicationRequired
+cap_chargeablename                       Virtual      None
+cap_chargerate                           Money        None
+cap_chargerate_base                      Money        None
+cap_costrate                             Money        None
+cap_costrate_base                        Money        None
+cap_date                                 DateTime     ApplicationRequired
+cap_hours                                Decimal      ApplicationRequired
+cap_name                                 String       ApplicationRequired
+cap_taskid                               Lookup       ApplicationRequired
+cap_taskidname                           String       None
+  lookups:
+    createdby -> systemuser  (nav createdby)
+    createdonbehalfby -> systemuser  (nav createdonbehalfby)
+    modifiedby -> systemuser  (nav modifiedby)
+    modifiedonbehalfby -> systemuser  (nav modifiedonbehalfby)
+    owninguser -> systemuser  (nav owninguser)
+    owningteam -> team  (nav owningteam)
+    ownerid -> owner  (nav ownerid)
+    owningbusinessunit -> businessunit  (nav owningbusinessunit)
+    transactioncurrencyid -> transactioncurrency  (nav transactioncurrencyid)
+    cap_taskid -> cap_task  (nav cap_TaskId)
+  quick-create enabled: True
+  rows: 1
+
+=== cap_budgetline ===
+cap_chargerate                           Money        None
+cap_chargerate_base                      Money        None
+cap_costrate                             Money        None
+cap_costrate_base                        Money        None
+cap_hours                                Decimal      ApplicationRequired
+cap_jobid                                Lookup       None
+cap_jobidname                            String       None
+cap_name                                 String       ApplicationRequired
+cap_taskid                               Lookup       None
+cap_taskidname                           String       None
+  lookups:
+    createdby -> systemuser  (nav createdby)
+    createdonbehalfby -> systemuser  (nav createdonbehalfby)
+    modifiedby -> systemuser  (nav modifiedby)
+    modifiedonbehalfby -> systemuser  (nav modifiedonbehalfby)
+    owninguser -> systemuser  (nav owninguser)
+    owningteam -> team  (nav owningteam)
+    ownerid -> owner  (nav ownerid)
+    owningbusinessunit -> businessunit  (nav owningbusinessunit)
+    transactioncurrencyid -> transactioncurrency  (nav transactioncurrencyid)
+    cap_taskid -> cap_task  (nav cap_TaskId)
+    cap_jobid -> cap_job  (nav cap_JobId)
+  quick-create enabled: False
+  rows: 0
